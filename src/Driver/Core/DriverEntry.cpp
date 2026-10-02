@@ -17,9 +17,7 @@ namespace Pgd
         }
 
         if (DriverObject) {
-            if (DriverObject) {
             DriverObject->DriverUnload = DriverLifecycle::Unload;
-        }
         }
 
         if (!Resolver::ResolveAll() || !Resolver::Ready) {
