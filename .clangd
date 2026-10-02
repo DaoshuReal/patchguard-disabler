@@ -1,0 +1,28 @@
+CompileFlags:
+  CompilationDatabase: intermediate
+  Add: [-Iinclude, -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH]
+  Compiler: clang-cl
+---
+If:
+  PathMatch: src/Driver/.*
+  CompileFlags:
+    Add: [-I"C:/Program Files (x86)/Windows Kits/10/Include/10.0.28000.0/km", -I"C:/Program Files (x86)/Windows Kits/10/Include/10.0.28000.0/km/crt", -D_AMD64_, -DAMD64, -D_WIN64, -DWIN64, -DWINVER=0x0A00, -D_WIN32_WINNT=0x0A00, -DNTDDI_VERSION=0x0A00000C, -DPOOL_NX_OPTIN=1]
+    Remove: [/kernel, /GS, /Gy, /Zi, /sdl-, /W3]
+---
+If:
+  PathMatch: include/Driver/.*
+  CompileFlags:
+    Add: [-I"C:/Program Files (x86)/Windows Kits/10/Include/10.0.28000.0/km", -I"C:/Program Files (x86)/Windows Kits/10/Include/10.0.28000.0/km/crt", -D_AMD64_, -DAMD64, -D_WIN64, -DWIN64, -DWINVER=0x0A00, -D_WIN32_WINNT=0x0A00, -DNTDDI_VERSION=0x0A00000C, -DPOOL_NX_OPTIN=1]
+    Remove: [/kernel, /GS, /Gy, /Zi, /sdl-, /W3]
+---
+If:
+  PathMatch: src/Canary/.*
+  CompileFlags:
+    Add: [-I"C:/Program Files (x86)/Windows Kits/10/Include/10.0.28000.0/km", -I"C:/Program Files (x86)/Windows Kits/10/Include/10.0.28000.0/km/crt", -D_AMD64_, -DAMD64, -D_WIN64, -DWIN64, -DWINVER=0x0A00, -D_WIN32_WINNT=0x0A00, -DNTDDI_VERSION=0x0A00000C, -DPOOL_NX_OPTIN=1]
+    Remove: [/kernel, /GS, /Gy, /Zi, /sdl-, /W3]
+---
+If:
+  PathMatch: include/Canary/.*
+  CompileFlags:
+    Add: [-I"C:/Program Files (x86)/Windows Kits/10/Include/10.0.28000.0/km", -I"C:/Program Files (x86)/Windows Kits/10/Include/10.0.28000.0/km/crt", -D_AMD64_, -DAMD64, -D_WIN64, -DWIN64, -DWINVER=0x0A00, -D_WIN32_WINNT=0x0A00, -DNTDDI_VERSION=0x0A00000C, -DPOOL_NX_OPTIN=1]
+    Remove: [/kernel, /GS, /Gy, /Zi, /sdl-, /W3]
