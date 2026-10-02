@@ -6,13 +6,13 @@ to be clear: this is a poc that grew into a small project, not a maintained PG b
 
 ## what is this?
 
-- **PgDisabler** — resolves `HalPrivateDispatchTable`, `KiBugCheckActive`, `KiHardwareTrigger`, PRCB `IpiFrozen`/`Context`/`DebuggerSavedIRQL` offsets by scanning `KeBugCheckEx`/`KeBugCheck2`, then swaps the table's `PrepareForBugcheck` (`+0x108`) and `NotifyProcessorFreeze` (`+0x1A8`) slots via physical mapping. on a `0x109` it zeroes the active/trigger flags, parks `IpiFrozen`, and `RtlRestoreContext`s back to a trapped usermode-ish context instead of dying
-- **PgCanary** — the test harness. checks both hooks are resident (target outside `ntoskrnl` = hooked), fires a synthetic `0x109` with a planted `CONTEXT` on its own stack, and separately swaps `HalDispatchTable[1]<->[2]` for 8 minutes
+- **PgDisabler** - resolves `HalPrivateDispatchTable`, `KiBugCheckActive`, `KiHardwareTrigger`, PRCB `IpiFrozen`/`Context`/`DebuggerSavedIRQL` offsets by scanning `KeBugCheckEx`/`KeBugCheck2`, then swaps the table's `PrepareForBugcheck` (`+0x108`) and `NotifyProcessorFreeze` (`+0x1A8`) slots via physical mapping. on a `0x109` it zeroes the active/trigger flags, parks `IpiFrozen`, and `RtlRestoreContext`s back to a trapped usermode-ish context instead of dying
+- **PgCanary** - the test harness. checks both hooks are resident (target outside `ntoskrnl` = hooked), fires a synthetic `0x109` with a planted `CONTEXT` on its own stack, and separately swaps `HalDispatchTable[1]<->[2]` for 8 minutes
 
 features:
-- **scan-not-hardcode resolve** — `KeBugCheckEx` opcode shapes (`48/49 8B ... E8` for the PRCB context slot, `65 88 04` for the gs IRQL byte, `F0 FF 05` for the hardware trigger, `E8`-into-`F0 0F B1` for `KeBugCheck2` into `KiBugCheckActive`), spin/`pause`-search for the `IpiFrozen` shape, `HalPrivateDispatchTable` export + version gate (`6..0x100`)
-- **physical writes** — table slots go through `MmGetPhysicalAddress` + `MmMapIoSpaceEx`, so read-only HAL pages don't matter, with readback verify and restore-on-unload
-- **HIGH_LEVEL-safe swallow** — everything the hook touches at bugcheck IRQL is prove-mapped-first (`MmIsAddressValid` PTE walks, no SEH reliance, SEH can't catch faults there anyway), single `DbgPrint` on arm and nothing else
+- **scan-not-hardcode resolve** - `KeBugCheckEx` opcode shapes (`48/49 8B ... E8` for the PRCB context slot, `65 88 04` for the gs IRQL byte, `F0 FF 05` for the hardware trigger, `E8`-into-`F0 0F B1` for `KeBugCheck2` into `KiBugCheckActive`), spin/`pause`-search for the `IpiFrozen` shape, `HalPrivateDispatchTable` export + version gate (`6..0x100`)
+- **physical writes** - table slots go through `MmGetPhysicalAddress` + `MmMapIoSpaceEx`, so read-only HAL pages don't matter, with readback verify and restore-on-unload
+- **HIGH_LEVEL-safe swallow** - everything the hook touches at bugcheck IRQL is prove-mapped-first (`MmIsAddressValid` PTE walks, no SEH reliance, SEH can't catch faults there anyway), single `DbgPrint` on arm and nothing else
 
 ## screenshots
 
@@ -22,7 +22,7 @@ features:
 
 ![KeSetTimerEx decrypt](images/2.png)
 
-*IDA decompiler on `KeSetTimerEx`: `v7 = KiWaitNever ^ ROR(Timer ^ bswap(KiWaitAlways ^ Dpc), KiWaitNever)` — the cipher the timer-decrypt work inverts*
+*IDA decompiler on `KeSetTimerEx`: `v7 = KiWaitNever ^ ROR(Timer ^ bswap(KiWaitAlways ^ Dpc), KiWaitNever)` - the cipher the timer-decrypt work inverts*
 
 ![KiSetTimerEx decrypt](images/3.png)
 
@@ -30,16 +30,16 @@ features:
 
 ![KeBugCheck2](images/4.png)
 
-*IDA decompiler on `KeBugCheck2` — the function the resolver's `E8`-scan lands in to find `KiBugCheckActive` and the freeze spin*
+*IDA decompiler on `KeBugCheck2` - the function the resolver's `E8`-scan lands in to find `KiBugCheckActive` and the freeze spin*
 
 ## how it works
 
-1. **load** — `DriverEntry` finds `ntoskrnl` base/size off `PsLoadedModuleList`, runs the resolver, version-checks the HAL table, installs both hooks with readback verify. any failure returns `STATUS_UNSUCCESSFUL` with zero hooks left behind
-2. **resolve** — `KeBugCheckEx` is the core: one scan each for the context slot, the gs IRQL byte, the hardware trigger, and the call into `KeBugCheck2`. inside `KeBugCheck2` the `pause; jmp` spin is hunted to derive the `IpiFrozen` PRCB offset (three shape variants and a displacement fallback)
-3. **hook** — `HalHook::Install` saves both originals, writes `HookHandler::Prepare` / `NotifyFreeze` through the physical mapping, reads both slots back, reverts everything on mismatch
-4. **swallow** — every `PrepareForBugcheck` call reads the trapped `CONTEXT` out of the PRCB and checks `Rcx`. non-`0x109` falls straight through to the original. on `0x109`: clear active + trigger, set `IpiFrozen = 5`, spoof the PCR major version around the critical section, stash the saved IRQL, raise to `DISPATCH` (IF set) or `HIGH` (IF clear), scan the stack for the planted `CONTEXT` fingerprint (`0x10005F`/`0x10001F`, `Cs == 0x10`, user segments), and `RtlRestoreContext` into it
-5. **canary** — `CheckHooks` reports residency, `StartRealPatch` swaps the HAL slots on a 5s-delayed thread and restores after 8 minutes, `FireSynthetic` plants a `CONTEXT` locally and calls `KeBugCheckEx(0x109, ...)`. surviving prints `Survived synthetic 0x109`
-6. **unload** — `DriverLifecycle::Unload` physically writes both originals back.
+1. **load** - `DriverEntry` finds `ntoskrnl` base/size off `PsLoadedModuleList`, runs the resolver, version-checks the HAL table, installs both hooks with readback verify. any failure returns `STATUS_UNSUCCESSFUL` with zero hooks left behind
+2. **resolve** - `KeBugCheckEx` is the core: one scan each for the context slot, the gs IRQL byte, the hardware trigger, and the call into `KeBugCheck2`. inside `KeBugCheck2` the `pause; jmp` spin is hunted to derive the `IpiFrozen` PRCB offset (three shape variants and a displacement fallback)
+3. **hook** - `HalHook::Install` saves both originals, writes `HookHandler::Prepare` / `NotifyFreeze` through the physical mapping, reads both slots back, reverts everything on mismatch
+4. **swallow** - every `PrepareForBugcheck` call reads the trapped `CONTEXT` out of the PRCB and checks `Rcx`. non-`0x109` falls straight through to the original. on `0x109`: clear active + trigger, set `IpiFrozen = 5`, spoof the PCR major version around the critical section, stash the saved IRQL, raise to `DISPATCH` (IF set) or `HIGH` (IF clear), scan the stack for the planted `CONTEXT` fingerprint (`0x10005F`/`0x10001F`, `Cs == 0x10`, user segments), and `RtlRestoreContext` into it
+5. **canary** - `CheckHooks` reports residency, `StartRealPatch` swaps the HAL slots on a 5s-delayed thread and restores after 8 minutes, `FireSynthetic` plants a `CONTEXT` locally and calls `KeBugCheckEx(0x109, ...)`. surviving prints `Survived synthetic 0x109`
+6. **unload** - `DriverLifecycle::Unload` physically writes both originals back.
 
 ## project structure
 
